@@ -1,0 +1,6 @@
+.env
+*.passwd
+mosquitto/passwd
+mosquitto/certs/
+.pio/
+node_modules/
