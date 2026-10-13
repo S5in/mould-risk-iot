@@ -9,6 +9,7 @@ services:
       - "127.0.0.1:5432:5432"                  # reachable only from this PC, not the network
     volumes:
       - db-data:/var/lib/postgresql/data       # data survives container restarts
+      - ./db:/db:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U mould -d mould"]
       interval: 5s
