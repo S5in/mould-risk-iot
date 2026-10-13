@@ -20,6 +20,8 @@ services:
       - "127.0.0.1:1883:1883"                  # opened to the Wi-Fi network when the ESP32 arrives
     volumes:
       - ./mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - ./mosquitto/passwd:/mosquitto/config/passwd:ro
+      - ./mosquitto/acl:/mosquitto/config/acl:ro
       - mosquitto-data:/mosquitto/data
 
 volumes:

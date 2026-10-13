@@ -1,0 +1,5 @@
+user sim-001
+topic write org/demo-org/device/sim-001/telemetry
+
+user ingest
+topic read org/+/device/+/telemetry
