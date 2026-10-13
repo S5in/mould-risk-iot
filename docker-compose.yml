@@ -1,0 +1,27 @@
+services:
+  db:
+    image: timescale/timescaledb:latest-pg16   # Postgres + TimescaleDB;
+    environment:
+      POSTGRES_USER: mould
+      POSTGRES_DB: mould
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}  # read from local .env, never committed
+    ports:
+      - "127.0.0.1:5432:5432"                  # reachable only from this PC, not the network
+    volumes:
+      - db-data:/var/lib/postgresql/data       # data survives container restarts
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mould -d mould"]
+      interval: 5s
+      retries: 10
+
+  mosquitto:
+    image: eclipse-mosquitto:2
+    ports:
+      - "127.0.0.1:1883:1883"                  # opened to the Wi-Fi network when the ESP32 arrives
+    volumes:
+      - ./mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - mosquitto-data:/mosquitto/data
+
+volumes:
+  db-data:
+  mosquitto-data:
