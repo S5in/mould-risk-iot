@@ -1,8 +1,12 @@
+// Command simulator publishes fake sensor readings, standing in for the ESP32.
 package main
 
 import (
 	"encoding/json"
+	"flag"
+	"fmt"
 	"log"
+	"math"
 	"math/rand"
 	"os"
 	"os/signal"
@@ -11,14 +15,13 @@ import (
 	mqtt "github.com/eclipse/paho.mqtt.golang"
 )
 
-// Reading is the JSON message the "device" sends. This is our message contract.
-type Reading struct {
-	TemperatureC float64   `json:"temperature_c"`
-	HumidityRH   float64   `json:"humidity_rh"`
-	Timestamp    time.Time `json:"ts"`
+type reading struct {
+	TemperatureC float64 `json:"temperature_c"`
+	HumidityRH   float64 `json:"humidity_rh"`
+	Timestamp    string  `json:"ts"`
 }
 
-func getenv(key, fallback string) string {
+func env(key, fallback string) string {
 	if v := os.Getenv(key); v != "" {
 		return v
 	}
@@ -26,54 +29,67 @@ func getenv(key, fallback string) string {
 }
 
 func main() {
-	broker := getenv("MQTT_BROKER", "tcp://localhost:1883")
-	user := os.Getenv("MQTT_USER")
-	pass := os.Getenv("MQTT_PASS")
-	topic := getenv("MQTT_TOPIC", "org/demo-org/device/sim-001/telemetry")
+	interval := flag.Duration("interval", 5*time.Second, "time between readings")
+	count := flag.Int("count", 0, "stop after this many readings (0 = run until Ctrl+C)")
+	bad := flag.Bool("bad", false, "publish an invalid reading (humidity 150) to show it is rejected")
+	flag.Parse()
+
+	org := env("SIM_ORG", "demo-org")
+	device := env("SIM_DEVICE", "sim-001")
+	password := os.Getenv("SIM_MQTT_PASSWORD")
+	if password == "" {
+		log.Fatal("SIM_MQTT_PASSWORD is not set")
+	}
+	topic := fmt.Sprintf("org/%s/device/%s/telemetry", org, device)
 
 	opts := mqtt.NewClientOptions().
-		AddBroker(broker).
-		SetClientID(user).
-		SetUsername(user).
-		SetPassword(pass)
-
+		AddBroker(env("MQTT_BROKER", "tcp://localhost:1883")).
+		SetClientID(device).
+		SetUsername(device).
+		SetPassword(password).
+		SetAutoReconnect(true)
 	client := mqtt.NewClient(opts)
-	if token := client.Connect(); token.Wait() && token.Error() != nil {
-		log.Fatalf("connect failed: %v", token.Error())
+	if tok := client.Connect(); tok.Wait() && tok.Error() != nil {
+		log.Fatalf("connect: %v", tok.Error())
 	}
 	defer client.Disconnect(250)
-	log.Printf("connected to %s as %s", broker, user)
 
-	temp, hum := 21.0, 55.0
-	ticker := time.NewTicker(5 * time.Second)
+	interrupt := make(chan os.Signal, 1)
+	signal.Notify(interrupt, os.Interrupt)
+	ticker := time.NewTicker(*interval)
 	defer ticker.Stop()
-	stop := make(chan os.Signal, 1)
-	signal.Notify(stop, os.Interrupt)
 
-	for {
+	start := time.Now()
+	for n := 1; ; n++ {
+		minutes := time.Since(start).Minutes()
+		r := reading{
+			TemperatureC: round1(21 + 1.5*math.Sin(minutes/5) + rand.Float64()*0.2),
+			HumidityRH:   round1(55 + 8*math.Sin(minutes/7) + rand.Float64()*0.5),
+			Timestamp:    time.Now().UTC().Format(time.RFC3339Nano),
+		}
+		if *bad {
+			r.HumidityRH = 150
+		}
+		body, err := json.Marshal(r)
+		if err != nil {
+			log.Fatalf("marshal: %v", err)
+		}
+		tok := client.Publish(topic, 1, false, body)
+		tok.Wait()
+		if tok.Error() != nil {
+			log.Printf("publish failed: %v", tok.Error())
+		} else {
+			log.Printf("published to %s: %s", topic, body)
+		}
+		if *count > 0 && n >= *count {
+			return
+		}
 		select {
 		case <-ticker.C:
-			// random walk: small drift, kept inside plausible limits
-			temp += (rand.Float64() - 0.5) * 0.4
-			hum += (rand.Float64() - 0.5) * 1.5
-			if hum < 20 {
-				hum = 20
-			}
-			if hum > 95 {
-				hum = 95
-			}
-
-			payload, _ := json.Marshal(Reading{temp, hum, time.Now().UTC()})
-			token := client.Publish(topic, 1, false, payload)
-			token.Wait()
-			if token.Error() != nil {
-				log.Printf("publish failed: %v", token.Error())
-				continue
-			}
-			log.Printf("published %s", payload)
-		case <-stop:
-			log.Println("stopping")
+		case <-interrupt:
 			return
 		}
 	}
 }
+
+func round1(v float64) float64 { return math.Round(v*10) / 10 }

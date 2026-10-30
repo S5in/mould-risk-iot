@@ -25,6 +25,25 @@ services:
       - ./mosquitto/acl:/mosquitto/config/acl:ro
       - mosquitto-data:/mosquitto/data
 
+  ingestion:
+    build:
+      context: .
+      dockerfile: services/ingestion/Dockerfile
+    depends_on:
+      db:
+        condition: service_healthy
+      mosquitto:
+        condition: service_started
+    environment:
+      MQTT_BROKER: tcp://mosquitto:1883
+      INGEST_MQTT_USER: ingest
+      INGEST_MQTT_PASSWORD: ${INGEST_MQTT_PASSWORD}
+      PGHOST: db
+      PGUSER: mould
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      PGDATABASE: mould
+    restart: unless-stopped
+
 volumes:
   db-data:
   mosquitto-data:
