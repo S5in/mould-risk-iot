@@ -33,4 +33,3 @@ Authentication and ACLs are part of the design, not a later add-on; validating a
 - **Iteration 3 (due 15 Feb 2027):** TLS, alerts, rate limits, audit of the security checklist.
 - **Iteration 4 (due 16 Apr 2027):** evaluation.
 
-*Edit the "Record" cells in TESTING.md and add your own screenshots before submitting.*

@@ -22,13 +22,13 @@ CI (`.github/workflows/ci.yml`) runs gofmt, go vet, migrations plus seed, go tes
 ## Manual security tests (evidence for objective O6, first part)
 | # | Test | Expected | Result |
 |---|---|---|---|
-| S1 | Connect with no username | Refused | Record from your earlier run |
-| S2 | Connect as sim-001 with a wrong password | `not Authorized` | Record |
-| S3 | sim-001 publishes to another device's topic | Message dropped by ACL | Record (done earlier) |
-| S4 | ingest tries to publish | Dropped by ACL | Record |
-| S5 | Valid reading via simulator | Row in `readings` | Record |
-| S6 | `simulator -bad` (humidity 150) | Ingestion logs `rejected`, no row | Record |
-| S7 | Unknown device key under a valid org | Rejected, no row | Record |
+| S1 | Connect with no username | Refused | evidence/testing1.png |
+| S2 | Connect as sim-001 with a wrong password | `not Authorized` | evidence/testing1.png |
+| S3 | sim-001 publishes to another device's topic | Message dropped by ACL | evidence/testing1.png |
+| S4 | ingest tries to publish | Dropped by ACL | evidence/testing1.png |
+| S5 | Valid reading via simulator | Row in `readings` | evidence/testing1.pngd |
+| S6 | `simulator -bad` (humidity 150) | Ingestion logs `rejected`, no row | evidence/testing1.png |
+| S7 | Unknown device key under a valid org | Rejected, no row | evidence/testing1.png |
 
 ## Data-path demo test
 1. `docker compose up -d --build`
