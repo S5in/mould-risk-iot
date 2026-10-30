@@ -1,5 +1,0 @@
-bin/
-.pio/
-firmware/include/secrets.h
-*.env
-.env
