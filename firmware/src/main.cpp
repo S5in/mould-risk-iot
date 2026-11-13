@@ -84,7 +84,7 @@ void setup() {
   snprintf(topic, sizeof topic, "org/%s/device/%s/telemetry", ORG_SLUG, DEVICE_KEY);
 
   Wire.begin();  // SDA GPIO21, SCL GPIO22
-  if (!sht31.begin(0x44)) {
+  if (!sht31.begin(0x45)) {
     Serial.println("SHT31 not found at 0x44 (try 0x45)");
   }
   connectWifi();
