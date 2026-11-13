@@ -37,6 +37,20 @@ CI (`.github/workflows/ci.yml`) runs gofmt, go vet, migrations plus seed, go tes
 4. `docker compose exec db psql -U <user> -d <db> -c "select device_time, temperature_c, humidity_rh from readings order by device_time desc limit 5;"`
 
 ## Known gaps (honest list)
-- The ESP32 has not run on real hardware (Mouser delivery pending). Firmware is compiled in CI only.
+- Wi-Fi loss recovery (H5) has not been tested on hardware yet.
+- No local buffer: readings taken while Wi-Fi or the broker is down are lost.
 - No TLS yet (planned Iteration 3). Passwords travel unencrypted on the local network.
 - Broker restart and database outage behaviour are covered by reconnect code but not by an automated test.
+
+## Hardware tests (Iteration 2, real node esp32-001)
+Setup: ESP32-DevKitC-32E and DFRobot SHT31 on the home Wi-Fi, publishing every 30 s to Mosquitto on the development laptop, stored by the ingestion service. Plain MQTT on the home network; TLS is planned for Iteration 3.
+
+| # | Test | What I did | Result | Evidence |
+|---|---|---|---|---|
+| H1 | Sensor check | Flashed tools/sensor-check (no network) | Temperature and humidity printed every 2 s (for example 16.05 C, 61.88 %RH) | evidence/testing2.png |
+| H2 | End to end | Flashed the firmware, queried the database | Rows for esp32-001 stored; device_time and received_at about 50 ms apart | evidence/testing2.png |
+| H3 | Live response | Breathed on and handled the sensor | Humidity rose to 68.9 %RH and temperature to 20.3 C in stored rows, then fell back | evidence/testing2.png |
+| H4 | Broker restart | docker compose restart mosquitto while running | ESP32 logged rc=-4, retried about 5 s later and reconnected without a reset; readings resumed | evidence/testing4.png |
+| H5 | Wi-Fi loss | Not tested yet | n/a | n/a |
+| H6 | Wrong password | Changed the device password on the broker, restarted it | ESP32 logged rc=5 repeatedly, broker logged "not authorised", nothing stored; real password restored afterwards | evidence/testing6.png |
+| H7 | Sensor unplugged | Pulled the SDA wire while running | "sensor read failed, skipping" twice, no rows stored for that period; recovered on the next tick after replugging | evidence/testing7.png |
