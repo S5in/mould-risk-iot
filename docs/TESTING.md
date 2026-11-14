@@ -54,3 +54,16 @@ Setup: ESP32-DevKitC-32E and DFRobot SHT31 on the home Wi-Fi, publishing every 3
 | H5 | Wi-Fi loss | Not tested yet | n/a | n/a |
 | H6 | Wrong password | Changed the device password on the broker, restarted it | ESP32 logged rc=5 repeatedly, broker logged "not authorised", nothing stored; real password restored afterwards | evidence/testing6.png |
 | H7 | Sensor unplugged | Pulled the SDA wire while running | "sensor read failed, skipping" twice, no rows stored for that period; recovered on the next tick after replugging | evidence/testing7.png |
+
+### H8 Long run (13 Nov 20:25 to 14 Nov 10:50)
+The node logged continuously overnight. 1,533 readings were stored against about 1,729 expected at one every 30 s (about 89%). Once on a stable USB wall charger (from about 23:28) 1,244 of about 1,246 expected readings arrived (about 99.8%).
+
+| Gap | Cause |
+|---|---|
+| 1 h 17 min | Power bank switched itself off; moved to a wall charger |
+| 15 min 56 s | Docker stopped (db and mosquitto exited with code 255); restarted by hand, then restart policies were added |
+| 1 min 30 s and 1 min 10 s | Fault tests H7 and H6 |
+| 1 min 27 s | Board rebooting on the charger |
+| 1 min 4 s (02:03) | Not identified: one missed reading |
+
+Lessons: a power bank can cut off a low-draw device; containers need restart policies; the firmware has no local buffer, so readings are lost while the broker or Wi-Fi is down.
