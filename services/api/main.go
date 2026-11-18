@@ -14,6 +14,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/S5in/mould-risk-iot/internal/apistore"
+	"github.com/S5in/mould-risk-iot/internal/auth"
 	"github.com/S5in/mould-risk-iot/internal/httpapi"
 )
 
@@ -23,6 +24,11 @@ func main() {
 	dbURL := os.Getenv("DATABASE_URL")
 	if dbURL == "" {
 		log.Error("DATABASE_URL is not set")
+		os.Exit(1)
+	}
+	tokens, err := auth.NewTokens(os.Getenv("JWT_SECRET"), time.Hour)
+	if err != nil {
+		log.Error("JWT_SECRET problem", "err", err)
 		os.Exit(1)
 	}
 	addr := os.Getenv("API_ADDR")
@@ -41,7 +47,7 @@ func main() {
 	defer pool.Close()
 
 	store := apistore.New(pool)
-	var handler http.Handler = httpapi.New(store, log).Handler()
+	var handler http.Handler = httpapi.New(store, tokens, log).Handler()
 
 	// TEMPORARY until login exists (step 5): act as one fixed organisation.
 	if slug := os.Getenv("DEV_ORG_SLUG"); slug != "" {

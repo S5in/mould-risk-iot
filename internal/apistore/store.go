@@ -4,6 +4,7 @@ package apistore
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -81,9 +82,9 @@ func (s *Store) LatestReading(ctx context.Context, orgID, roomID string) (httpap
 	var r httpapi.Reading
 	err := s.pool.QueryRow(ctx,
 		`SELECT device_time, temperature_c, humidity_rh
-   FROM readings
-  WHERE room_id = $1 AND org_id = $2
-  ORDER BY device_time DESC LIMIT 1`, roomID, orgID).
+		   FROM readings
+		  WHERE room_id = $1 AND org_id = $2
+		  ORDER BY device_time DESC LIMIT 1`, roomID, orgID).
 		Scan(&r.Time, &r.TemperatureC, &r.HumidityRH)
 	if err == pgx.ErrNoRows {
 		return r, false, nil // no readings, or not this org's room: same answer
@@ -98,9 +99,9 @@ func (s *Store) Readings(ctx context.Context, orgID, roomID string, since time.T
 	}
 	rows, err := s.pool.Query(ctx,
 		`SELECT device_time, temperature_c, humidity_rh
-   FROM readings
-  WHERE room_id = $1 AND org_id = $2 AND device_time >= $3
-  ORDER BY device_time DESC LIMIT $4`, roomID, orgID, since, limit)
+		   FROM readings
+		  WHERE room_id = $1 AND org_id = $2 AND device_time >= $3
+		  ORDER BY device_time DESC LIMIT $4`, roomID, orgID, since, limit)
 	if err != nil {
 		return nil, false, err
 	}
@@ -114,4 +115,32 @@ func (s *Store) Readings(ctx context.Context, orgID, roomID string, since time.T
 		out = append(out, r)
 	}
 	return out, true, rows.Err()
+}
+
+// UserByEmail finds a user by email, ignoring upper/lower case (matching the
+// users_email_lower_idx unique index).
+func (s *Store) UserByEmail(ctx context.Context, email string) (httpapi.User, bool, error) {
+	var u httpapi.User
+	err := s.pool.QueryRow(ctx,
+		`SELECT id::text, org_id::text, role, password_hash
+		   FROM users WHERE lower(email) = lower($1)`, email).
+		Scan(&u.ID, &u.OrgID, &u.Role, &u.PasswordHash)
+	if err == pgx.ErrNoRows {
+		return u, false, nil
+	}
+	return u, err == nil, err
+}
+
+// CreateUser adds a user to the organisation with the given slug and returns
+// the new user's ID. passwordHash must already be a bcrypt hash.
+func (s *Store) CreateUser(ctx context.Context, orgSlug, email, passwordHash, role string) (string, error) {
+	var id string
+	err := s.pool.QueryRow(ctx,
+		`INSERT INTO users (org_id, email, password_hash, role)
+		 SELECT o.id, $2, $3, $4 FROM organisations o WHERE o.slug = $1
+		 RETURNING id::text`, orgSlug, email, passwordHash, role).Scan(&id)
+	if err == pgx.ErrNoRows {
+		return "", fmt.Errorf("no organisation with slug %q", orgSlug)
+	}
+	return id, err
 }

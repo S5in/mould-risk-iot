@@ -5,7 +5,6 @@ import (
 	"errors"
 	"io"
 	"log/slog"
-	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
@@ -64,8 +63,13 @@ func (f fakeStore) Readings(_ context.Context, org, room string, _ time.Time, _ 
 
 func do(t *testing.T, db Store, org, method, path string) *httptest.ResponseRecorder {
 	t.Helper()
-	s := New(db, slog.New(slog.NewTextHandler(io.Discard, nil)))
-	req := httptest.NewRequest(method, path, nil)
+	return doBody(t, db, org, method, path, "")
+}
+
+func doBody(t *testing.T, db Store, org, method, path, body string) *httptest.ResponseRecorder {
+	t.Helper()
+	s := New(db, fakeTokens{}, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	req := httptest.NewRequest(method, path, strings.NewReader(body))
 	if org != "" {
 		req = req.WithContext(WithOrg(req.Context(), org))
 	}
@@ -154,5 +158,3 @@ func TestStoreErrorIs500WithoutDetail(t *testing.T) {
 		t.Fatal("error detail leaked")
 	}
 }
-
-var _ = http.StatusOK

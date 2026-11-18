@@ -37,16 +37,20 @@ type Store interface {
 	ListRooms(ctx context.Context, orgID, propertyID string) (rooms []Room, found bool, err error)
 	LatestReading(ctx context.Context, orgID, roomID string) (r Reading, found bool, err error)
 	Readings(ctx context.Context, orgID, roomID string, since time.Time, limit int) (rs []Reading, found bool, err error)
+	// UserByEmail is the one lookup that is not org-scoped: at login we do not
+	// know the org yet. Emails are unique across all orgs.
+	UserByEmail(ctx context.Context, email string) (u User, found bool, err error)
 }
 
 // Server wires dependencies to routes.
 type Server struct {
-	db  Store
-	log *slog.Logger
+	db     Store
+	tokens TokenIssuer
+	log    *slog.Logger
 }
 
-func New(db Store, log *slog.Logger) *Server {
-	return &Server{db: db, log: log}
+func New(db Store, tokens TokenIssuer, log *slog.Logger) *Server {
+	return &Server{db: db, tokens: tokens, log: log}
 }
 
 // Handler returns the router. /health is public; everything under /v1/ needs
@@ -54,6 +58,7 @@ func New(db Store, log *slog.Logger) *Server {
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /health", s.health)
+	mux.HandleFunc("POST /v1/auth/login", s.login)
 	mux.HandleFunc("GET /v1/properties", s.listProperties)
 	mux.HandleFunc("GET /v1/properties/{id}/rooms", s.listRooms)
 	mux.HandleFunc("GET /v1/rooms/{id}/readings/latest", s.latestReading)
