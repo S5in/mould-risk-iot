@@ -13,6 +13,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/S5in/mould-risk-iot/internal/apistore"
 	"github.com/S5in/mould-risk-iot/internal/httpapi"
 )
 
@@ -39,9 +40,23 @@ func main() {
 	}
 	defer pool.Close()
 
+	store := apistore.New(pool)
+	var handler http.Handler = httpapi.New(store, log).Handler()
+
+	// TEMPORARY until login exists (step 5): act as one fixed organisation.
+	if slug := os.Getenv("DEV_ORG_SLUG"); slug != "" {
+		orgID, err := store.OrgIDBySlug(ctx, slug)
+		if err != nil {
+			log.Error("DEV_ORG_SLUG not found", "slug", slug, "err", err)
+			os.Exit(1)
+		}
+		log.Warn("DEV MODE: every request is treated as this organisation", "slug", slug)
+		handler = httpapi.DevOrg(orgID, handler)
+	}
+
 	srv := &http.Server{
 		Addr:              addr,
-		Handler:           httpapi.New(pool, log).Handler(),
+		Handler:           handler,
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 
